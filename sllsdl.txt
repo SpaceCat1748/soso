@@ -1,0 +1,646 @@
+// ==UserScript==
+// @name         Game Auto-Clicker Premium UI
+// @namespace    http://tampermonkey.net/
+// @version      1.2
+// @description  Автоматически кликает на game items с настраиваемыми изображениями
+// @author       Your Name
+// @match        https://dev.lovikwami-test-bot.ru/*
+// @grant        GM_addStyle
+// @grant        GM_getValue
+// @grant        GM_setValue
+// @grant        GM_notification
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    // Default images
+    const defaultImages = [
+        '/static/media/game-plag.51348cff033cc07d7637.png',
+        '/static/media/game-tikki.cd60f8f87755a99c8e22.png',
+        '/static/media/game-trix.e23fd9a0f8b12a912110.png',
+        '/static/media/game-logo-tv3.81749e579e8aa6566a53.png',
+        '/static/media/game-acuma-item.3619aa78364bfbe8dba3.png'
+    ];
+
+    // Load saved settings
+    let targetImages = GM_getValue('targetImages', defaultImages);
+    let isRunning = GM_getValue('isRunning', false);
+    let intervalSpeed = GM_getValue('intervalSpeed', 200);
+    let darkMode = GM_getValue('darkMode', true);
+
+    // Create modern UI
+    function createUI() {
+        GM_addStyle(`
+            :root {
+                --primary-color: #6200ee;
+                --primary-dark: #3700b3;
+                --secondary-color: #03dac6;
+                --background: #121212;
+                --surface: #1e1e1e;
+                --error: #cf6679;
+                --on-primary: #ffffff;
+                --on-secondary: #000000;
+                --on-background: #ffffff;
+                --on-surface: #ffffff;
+                --on-error: #000000;
+                --gold-color: #ffd700;
+            }
+
+            .light-mode {
+                --background: #f5f5f5;
+                --surface: #ffffff;
+                --on-background: #000000;
+                --on-surface: #000000;
+                --gold-color: #daa520;
+            }
+
+            #gameClickerContainer {
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                width: 350px;
+                z-index: 999999;
+                font-family: 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+                transition: all 0.3s ease;
+            }
+
+            #gameClickerUI {
+                background-color: var(--surface);
+                color: var(--on-surface);
+                border-radius: 12px;
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+                overflow: hidden;
+                transition: all 0.3s ease;
+            }
+
+            #gameClickerHeader {
+                background-color: var(--primary-color);
+                color: var(--on-primary);
+                padding: 16px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                cursor: move;
+            }
+
+            #gameClickerTitle {
+                font-size: 18px;
+                font-weight: 600;
+                margin: 0;
+            }
+
+            #gameClickerControls {
+                display: flex;
+                gap: 8px;
+            }
+
+            .gameClickerBtn {
+                background: none;
+                border: none;
+                color: var(--on-primary);
+                cursor: pointer;
+                font-size: 16px;
+                padding: 4px;
+                border-radius: 50%;
+                width: 28px;
+                height: 28px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: background-color 0.2s;
+            }
+
+            .gameClickerBtn:hover {
+                background-color: rgba(255, 255, 255, 0.2);
+            }
+
+            #gameClickerContent {
+                padding: 16px;
+            }
+
+            .section {
+                margin-bottom: 16px;
+            }
+
+            .section-title {
+                font-size: 14px;
+                font-weight: 600;
+                margin-bottom: 8px;
+                color: var(--on-surface);
+                opacity: 0.8;
+            }
+
+            #imageList {
+                width: 100%;
+                height: 100px;
+                background-color: var(--background);
+                color: var(--on-background);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 6px;
+                padding: 8px;
+                font-family: monospace;
+                resize: vertical;
+                margin-bottom: 8px;
+            }
+
+            .btn-group {
+                display: flex;
+                gap: 8px;
+                margin-top: 8px;
+            }
+
+            .btn {
+                flex: 1;
+                padding: 8px 12px;
+                border-radius: 6px;
+                border: none;
+                font-weight: 500;
+                cursor: pointer;
+                transition: all 0.2s;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 6px;
+            }
+
+            .btn-primary {
+                background-color: var(--primary-color);
+                color: var(--on-primary);
+            }
+
+            .btn-primary:hover {
+                background-color: var(--primary-dark);
+            }
+
+            .btn-secondary {
+                background-color: var(--surface);
+                color: var(--primary-color);
+                border: 1px solid var(--primary-color);
+            }
+
+            .btn-secondary:hover {
+                background-color: rgba(98, 0, 238, 0.1);
+            }
+
+            .btn-danger {
+                background-color: var(--error);
+                color: var(--on-error);
+            }
+
+            .btn-danger:hover {
+                background-color: #b00020;
+            }
+
+            .speed-control {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                margin-top: 8px;
+            }
+
+            .speed-input {
+                flex: 1;
+                background-color: var(--background);
+                color: var(--on-background);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 6px;
+                padding: 8px;
+                text-align: center;
+            }
+
+            .speed-btn {
+                width: 32px;
+                height: 32px;
+                border-radius: 50%;
+                background-color: var(--primary-color);
+                color: var(--on-primary);
+                border: none;
+                font-weight: bold;
+                cursor: pointer;
+                transition: background-color 0.2s;
+            }
+
+            .speed-btn:hover {
+                background-color: var(--primary-dark);
+            }
+
+            #statusIndicator {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                margin-top: 16px;
+                padding: 8px;
+                border-radius: 6px;
+                background-color: var(--background);
+            }
+
+            .indicator {
+                width: 12px;
+                height: 12px;
+                border-radius: 50%;
+                background-color: #f44336;
+            }
+
+            .indicator.active {
+                background-color: #4caf50;
+                animation: pulse 1.5s infinite;
+            }
+
+            @keyframes pulse {
+                0% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7); }
+                70% { box-shadow: 0 0 0 8px rgba(76, 175, 80, 0); }
+                100% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); }
+            }
+
+            .status-text {
+                font-size: 14px;
+            }
+
+            .quick-actions {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 8px;
+                margin-top: 12px;
+            }
+
+            .quick-btn {
+                padding: 8px;
+                border-radius: 6px;
+                background-color: var(--background);
+                color: var(--on-background);
+                border: none;
+                cursor: pointer;
+                transition: background-color 0.2s;
+                font-size: 12px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 6px;
+            }
+
+            .quick-btn:hover {
+                background-color: rgba(98, 0, 238, 0.2);
+            }
+
+            .coins-display {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                margin-top: 12px;
+                padding: 8px;
+                border-radius: 6px;
+                background-color: var(--background);
+                color: var(--gold-color);
+                font-weight: bold;
+            }
+
+            .coins-icon {
+                font-size: 16px;
+            }
+
+            .coins-value {
+                font-size: 14px;
+            }
+
+            .stats-container {
+                display: flex;
+                justify-content: space-between;
+                margin-top: 12px;
+            }
+
+            .stats-item {
+                flex: 1;
+                text-align: center;
+                padding: 8px;
+                background-color: var(--background);
+                border-radius: 6px;
+                font-size: 12px;
+            }
+
+            .stats-value {
+                font-weight: bold;
+                color: var(--gold-color);
+            }
+        `);
+
+        const container = document.createElement('div');
+        container.id = 'gameClickerContainer';
+
+        const ui = document.createElement('div');
+        ui.id = 'gameClickerUI';
+        ui.className = darkMode ? '' : 'light-mode';
+
+        ui.innerHTML = `
+            <div id="gameClickerHeader">
+                <h3 id="gameClickerTitle">Game Auto-Clicker</h3>
+                <div id="gameClickerControls">
+                    <button class="gameClickerBtn" id="themeToggle">🌓</button>
+                    <button class="gameClickerBtn" id="minimizeBtn">−</button>
+                    <button class="gameClickerBtn" id="closeBtn">×</button>
+                </div>
+            </div>
+            <div id="gameClickerContent">
+                <div class="section">
+                    <div class="section-title">Target Images</div>
+                    <textarea id="imageList">${targetImages.join('\n')}</textarea>
+                    <div class="btn-group">
+                        <button class="btn btn-primary" id="toggleScript">
+                            <span class="btn-icon">${isRunning ? '⏸' : '▶'}</span>
+                            <span class="btn-text">${isRunning ? 'Pause' : 'Start'}</span>
+                        </button>
+                        <button class="btn btn-secondary" id="saveSettings">💾 Save</button>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <div class="section-title">Speed Control</div>
+                    <div class="speed-control">
+                        <button class="speed-btn" id="decreaseSpeed">-</button>
+                        <input type="number" class="speed-input" id="intervalSpeed" value="${intervalSpeed}" min="50">
+                        <button class="speed-btn" id="increaseSpeed">+</button>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <div class="section-title">Quick Actions</div>
+                    <div class="quick-actions">
+                        <button class="quick-btn" id="quickAcumaClick">
+                            <span>🎯</span>
+                            <span>Click Acuma</span>
+                        </button>
+                        <button class="quick-btn" id="removeClicked">
+                            <span>🗑️</span>
+                            <span>Remove Clicked</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="stats-container">
+                    <div class="stats-item">
+                        <div>Coins</div>
+                        <div class="stats-value" id="coinsValue">0</div>
+                    </div>
+                    <div class="stats-item">
+                        <div>Clicked</div>
+                        <div class="stats-value" id="clickedCount">0</div>
+                    </div>
+                </div>
+
+                <div id="statusIndicator">
+                    <div class="indicator ${isRunning ? 'active' : ''}"></div>
+                    <span class="status-text">${isRunning ? 'Running' : 'Stopped'}</span>
+                </div>
+            </div>
+        `;
+
+        container.appendChild(ui);
+        document.body.appendChild(container);
+
+        // Add event listeners
+        document.getElementById('toggleScript').addEventListener('click', toggleScript);
+        document.getElementById('saveSettings').addEventListener('click', saveSettings);
+        document.getElementById('increaseSpeed').addEventListener('click', () => changeSpeed(50));
+        document.getElementById('decreaseSpeed').addEventListener('click', () => changeSpeed(-50));
+        document.getElementById('intervalSpeed').addEventListener('change', updateSpeed);
+        document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+        document.getElementById('minimizeBtn').addEventListener('click', toggleMinimize);
+        document.getElementById('closeBtn').addEventListener('click', closeUI);
+        document.getElementById('quickAcumaClick').addEventListener('click', clickAcumaItem);
+        document.getElementById('removeClicked').addEventListener('click', removeClickedItems);
+
+        // Make the UI draggable
+        makeDraggable(ui, document.getElementById('gameClickerHeader'));
+
+        // Start coins monitoring
+        updateCoinsDisplay();
+        setInterval(updateCoinsDisplay, 1000);
+    }
+
+    // Update coins display
+    function updateCoinsDisplay() {
+        const coinsElement = document.querySelector('.app-coins--value');
+        if (coinsElement) {
+            const coinsValue = coinsElement.textContent.trim();
+            document.getElementById('coinsValue').textContent = coinsValue;
+        }
+    }
+
+    // Update clicked items count
+    function updateClickedCount() {
+        const count = document.querySelectorAll('.app-game-item.app-game-item_clicked').length;
+        document.getElementById('clickedCount').textContent = count;
+    }
+
+    // Toggle script on/off
+    function toggleScript() {
+        isRunning = !isRunning;
+        GM_setValue('isRunning', isRunning);
+
+        const toggleBtn = document.getElementById('toggleScript');
+        toggleBtn.querySelector('.btn-icon').textContent = isRunning ? '⏸' : '▶';
+        toggleBtn.querySelector('.btn-text').textContent = isRunning ? 'Pause' : 'Start';
+
+        const statusIndicator = document.querySelector('.indicator');
+        const statusText = document.querySelector('.status-text');
+
+        if (isRunning) {
+            statusIndicator.classList.add('active');
+            statusText.textContent = 'Running';
+            startClicker();
+        } else {
+            statusIndicator.classList.remove('active');
+            statusText.textContent = 'Stopped';
+            stopClicker();
+        }
+    }
+
+    // Save settings
+    function saveSettings() {
+        const imageText = document.getElementById('imageList').value;
+        targetImages = imageText.split('\n').filter(line => line.trim());
+        GM_setValue('targetImages', targetImages);
+
+        intervalSpeed = parseInt(document.getElementById('intervalSpeed').value);
+        GM_setValue('intervalSpeed', intervalSpeed);
+
+        if (isRunning) {
+            stopClicker();
+            startClicker();
+        }
+
+        GM_notification({
+            text: 'Settings saved successfully!',
+            title: 'Game Auto-Clicker',
+            image: 'https://img.icons8.com/fluency/48/000000/checkmark.png'
+        });
+    }
+
+    // Change speed
+    function changeSpeed(amount) {
+        const speedInput = document.getElementById('intervalSpeed');
+        let newSpeed = parseInt(speedInput.value) + amount;
+        if (newSpeed < 50) newSpeed = 50;
+        speedInput.value = newSpeed;
+        updateSpeed();
+    }
+
+    // Update speed
+    function updateSpeed() {
+        const speedInput = document.getElementById('intervalSpeed');
+        intervalSpeed = parseInt(speedInput.value);
+        if (intervalSpeed < 50) {
+            intervalSpeed = 50;
+            speedInput.value = 50;
+        }
+        GM_setValue('intervalSpeed', intervalSpeed);
+
+        if (isRunning) {
+            stopClicker();
+            startClicker();
+        }
+    }
+
+    // Toggle theme
+    function toggleTheme() {
+        darkMode = !darkMode;
+        GM_setValue('darkMode', darkMode);
+        const ui = document.getElementById('gameClickerUI');
+        if (darkMode) {
+            ui.classList.remove('light-mode');
+        } else {
+            ui.classList.add('light-mode');
+        }
+    }
+
+    // Toggle minimize
+    function toggleMinimize() {
+        const content = document.getElementById('gameClickerContent');
+        content.style.display = content.style.display === 'none' ? 'block' : 'none';
+    }
+
+    // Close UI
+    function closeUI() {
+        document.getElementById('gameClickerContainer').style.display = 'none';
+    }
+
+    // Click Acuma item
+    function clickAcumaItem() {
+        const img = document.querySelector('img[src="/static/media/game-acuma-item.3619aa78364bfbe8dba3.png"]');
+        if (img) {
+            img.click();
+            updateClickedCount();
+            GM_notification({
+                text: 'Acuma item clicked!',
+                title: 'Quick Action',
+                image: 'https://img.icons8.com/fluency/48/000000/checked.png'
+            });
+        } else {
+            GM_notification({
+                text: 'Acuma item not found!',
+                title: 'Quick Action',
+                image: 'https://img.icons8.com/fluency/48/000000/error.png'
+            });
+        }
+    }
+
+    // Remove clicked items
+    function removeClickedItems() {
+        const count = document.querySelectorAll('.app-game-item.app-game-item_clicked.app-game-item_success').length;
+        document.querySelectorAll('.app-game-item.app-game-item_clicked.app-game-item_success').forEach(el => el.remove());
+
+        updateClickedCount();
+        GM_notification({
+            text: `Removed ${count} clicked items!`,
+            title: 'Quick Action',
+            image: 'https://img.icons8.com/fluency/48/000000/trash.png'
+        });
+    }
+
+    // Make element draggable
+    function makeDraggable(element, handle) {
+        let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+
+        handle.onmousedown = dragMouseDown;
+
+        function dragMouseDown(e) {
+            e = e || window.event;
+            e.preventDefault();
+            pos3 = e.clientX;
+            pos4 = e.clientY;
+            document.onmouseup = closeDragElement;
+            document.onmousemove = elementDrag;
+        }
+
+        function elementDrag(e) {
+            e = e || window.event;
+            e.preventDefault();
+            pos1 = pos3 - e.clientX;
+            pos2 = pos4 - e.clientY;
+            pos3 = e.clientX;
+            pos4 = e.clientY;
+            element.style.top = (element.offsetTop - pos2) + "px";
+            element.style.left = (element.offsetLeft - pos1) + "px";
+        }
+
+        function closeDragElement() {
+            document.onmouseup = null;
+            document.onmousemove = null;
+        }
+    }
+
+    // Clicker functions
+    let clickerInterval;
+
+    function startClicker() {
+        clickerInterval = setInterval(() => {
+            clickAppGameItemWithImage(targetImages);
+            document.querySelectorAll('.app-game-item.app-game-item_clicked.app-game-item_success').forEach(el => el.remove());
+            document.querySelectorAll('img[src*="/static/media/game-acuma-item.3619aa78364bfbe8dba3.png"], img[src*="/static/media/game-xuppu.20d1e446975d0817cfe0.png"]').forEach(img => img.remove());
+            updateClickedCount();
+        }, intervalSpeed);
+    }
+
+    function stopClicker() {
+        if (clickerInterval) {
+            clearInterval(clickerInterval);
+            clickerInterval = null;
+        }
+    }
+
+    function clickAppGameItemWithImage(targetImageSrcList) {
+        const gameItems = document.querySelectorAll('.app-game-item');
+        let found = false;
+
+        gameItems.forEach(item => {
+            const imgElement = item.querySelector('img');
+
+            for (const targetImageSrc of targetImageSrcList) {
+                if (imgElement && imgElement.src.includes(targetImageSrc)) {
+                    item.click();
+                    console.log('Clicked on:', targetImageSrc);
+                    found = true;
+                    return;
+                }
+
+                const bgImage = window.getComputedStyle(item).backgroundImage;
+                if (bgImage.includes(targetImageSrc)) {
+                    item.click();
+                    console.log('Clicked on (background):', targetImageSrc);
+                    found = true;
+                    return;
+                }
+            }
+        });
+
+        if (!found) {
+            console.log('Images not found. Retrying...');
+        }
+    }
+
+    // Initialize
+    createUI();
+    if (isRunning) {
+        startClicker();
+    }
+})();
