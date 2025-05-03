@@ -649,55 +649,76 @@
         }
     }
 
-   const ok = [
-  '/static/media/game-plag.51348cff033cc07d7637.png',
-  '/static/media/game-tikki.cd60f8f87755a99c8e22.png',
-  '/static/media/game-trix.e23fd9a0f8b12a912110.png',
-  '/static/media/game-logo-tv3.81749e579e8aa6566a53.png'];
-
+// Функция для поиска и клика
 // Функция для поиска и клика
 function clickAppGameItemWithImage(targetImageSrcList) {
-  const gameItems = document.querySelectorAll('.app-game-item');
-  let found = false;
+    const gameItems = document.querySelectorAll('.app-game-item');
+    let found = false;
 
-  gameItems.forEach(item => {
-    const imgElement = item.querySelector('img');
-    
-    for (const targetImageSrc of targetImageSrcList) {
-      if (imgElement && imgElement.src.includes(targetImageSrc)) {
-        const touchEvent = new TouchEvent('touchend', {
-  bubbles: true,
-  cancelable: true,
-  view: window
-});
-item.dispatchEvent(touchEvent);
-        console.log('Клик по:', targetImageSrc);
-        console.log('Кол-во монет:', document.querySelector(".app-coins--value").textContent)
-        found = true;
-        return; // Прерываем, если нашли
-      }
+    gameItems.forEach(item => {
+        const imgElement = item.querySelector('img');
 
-      const bgImage = window.getComputedStyle(item).backgroundImage;
-      if (bgImage.includes(targetImageSrc)) {
-        item.click();
-        console.log('Клик по (background):', targetImageSrc);
-        found = true;
-        return;
-      }
+        for (const targetImageSrc of targetImageSrcList) {
+            if (imgElement && imgElement.src.includes(targetImageSrc)) {
+                try {
+                    // Get the bounding rectangle of the item to simulate a touch point
+                    const rect = item.getBoundingClientRect();
+                    const touchX = rect.left + rect.width / 2;
+                    const touchY = rect.top + rect.height / 2;
+
+                    // Create a Touch object for the touch point
+                    const touch = new Touch({
+                        identifier: Date.now(),
+                        target: item,
+                        clientX: touchX,
+                        clientY: touchY,
+                        screenX: touchX,
+                        screenY: touchY,
+                        pageX: touchX,
+                        pageY: touchY,
+                        radiusX: 10,
+                        radiusY: 10,
+                        rotationAngle: 0,
+                        force: 1
+                    });
+
+                    // Create a TouchEvent with proper touch properties
+                    const touchEvent = new TouchEvent('touchend', {
+                        bubbles: true,
+                        cancelable: true,
+                        view: window || self || globalThis, // Fallback to globalThis for broader compatibility
+                        touches: [touch],
+                        targetTouches: [touch],
+                        changedTouches: [touch]
+                    });
+
+                    item.dispatchEvent(touchEvent);
+                    console.log('Touch event dispatched for:', targetImageSrc);
+                } catch (e) {
+                    // Fallback to a regular click event if TouchEvent fails
+                    console.warn('TouchEvent failed, falling back to click:', e.message);
+                    item.click();
+                }
+                console.log('Клик по:', targetImageSrc);
+                console.log('Кол-во монет:', document.querySelector(".app-coins--value")?.textContent || 'N/A');
+                found = true;
+                return; // Прерываем, если нашли
+            }
+
+            const bgImage = window.getComputedStyle(item).backgroundImage;
+            if (bgImage.includes(targetImageSrc)) {
+                item.click();
+                console.log('Клик по (background):', targetImageSrc);
+                found = true;
+                return;
+            }
+        }
+    });
+
+    if (!found) {
+        console.log('Изображения не найдены. Повторяем через 3 секунды...');
     }
-  });
-
-  if (!found) {
-    console.log('Изображения не найдены. Повторяем через 3 секунды...');
-  }
 }
-
-// Запускаем поиск каждые 3 секунды
-const interval = setInterval(() => {
-  clickAppGameItemWithImage(ok);
-  document.querySelectorAll('.app-game-item.app-game-item_clicked.app-game-item_success').forEach(el => el.remove());
-  document.querySelectorAll('img[src*="/static/media/game-acuma-item.3619aa78364bfbe8dba3.png"], img[src*="/static/media/game-xuppu.20d1e446975d0817cfe0.png"]').forEach(img => img.remove());
-}, 200);
 
     // Initialize
     createUI();
