@@ -650,11 +650,14 @@
     }
 
 // Функция для поиска и клика
-// Функция для поиска и клика
-// Функция для поиска и клика
 function clickAppGameItemWithImage(targetImageSrcList) {
     const gameItems = document.querySelectorAll('.app-game-item');
     let found = false;
+
+    // Debugging: Log window/self/globalThis to check context
+    console.log('Window:', window);
+    console.log('Self:', self);
+    console.log('GlobalThis:', globalThis);
 
     gameItems.forEach(item => {
         const imgElement = item.querySelector('img');
@@ -667,37 +670,46 @@ function clickAppGameItemWithImage(targetImageSrcList) {
                     const touchX = rect.left + rect.width / 2;
                     const touchY = rect.top + rect.height / 2;
 
-                    // Create a Touch object for the touch point
+                    // Create a Touch object with comprehensive properties
                     const touch = new Touch({
                         identifier: Date.now(),
                         target: item,
                         clientX: touchX,
                         clientY: touchY,
-                        screenX: touchX,
-                        screenY: touchY,
-                        pageX: touchX,
-                        pageY: touchY,
+                        screenX: touchX + (window.screenX || 0),
+                        screenY: touchY + (window.screenY || 0),
+                        pageX: touchX + (window.pageXOffset || 0),
+                        pageY: touchY + (window.pageYOffset || 0),
                         radiusX: 10,
                         radiusY: 10,
                         rotationAngle: 0,
                         force: 1
                     });
 
-                    // Create a TouchEvent with proper touch properties
-                    const touchEvent = new TouchEvent('touchend', {
+                    // Create a TouchEvent with all required properties
+                    const touchEventInit = {
                         bubbles: true,
                         cancelable: true,
-                        view: window || self || globalThis, // Fallback to globalThis for broader compatibility
+                        view: window || self || globalThis || null, // Fallback to null if all fail
                         touches: [touch],
                         targetTouches: [touch],
-                        changedTouches: [touch]
-                    });
+                        changedTouches: [touch],
+                        ctrlKey: false,
+                        altKey: false,
+                        shiftKey: false,
+                        metaKey: false
+                    };
 
+                    // Debugging: Log TouchEvent init object
+                    console.log('TouchEventInit:', touchEventInit);
+
+                    const touchEvent = new TouchEvent('touchend', touchEventInit);
                     item.dispatchEvent(touchEvent);
                     console.log('Touch event dispatched for:', targetImageSrc);
                 } catch (e) {
-                    // Fallback to a regular click event if TouchEvent fails
-                    console.warn('TouchEvent failed, falling back to click:', e.message);
+                    // Log detailed error and fall back to click
+                    console.warn('TouchEvent failed:', e.message, e.stack);
+                    console.warn('Falling back to click for:', targetImageSrc);
                     item.click();
                 }
                 console.log('Клик по:', targetImageSrc);
