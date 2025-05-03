@@ -1,16 +1,14 @@
 // ==UserScript==
-// @name         Game Auto-Clicker Premium UI
-// @namespace    http://tampermonkey.net/
-// @version      1.2
-// @description  Автоматически кликает на game items с настраиваемыми изображениями
-// @author       Your Name
-// @match        https://dev.lovikwami-test-bot.ru/*
+// @name        New script
+// @namespace   Violentmonkey Scripts
+// @match       https://dev.lovikwami-test-bot.ru/*
+// @version     1.0
+// @author      -
 // @grant        GM_addStyle
 // @grant        GM_getValue
 // @grant        GM_setValue
-// @grant        GM_notification
+// @description 03.05.2025, 10:09:16
 // ==/UserScript==
-
 (function() {
     'use strict';
 
@@ -19,8 +17,7 @@
         '/static/media/game-plag.51348cff033cc07d7637.png',
         '/static/media/game-tikki.cd60f8f87755a99c8e22.png',
         '/static/media/game-trix.e23fd9a0f8b12a912110.png',
-        '/static/media/game-logo-tv3.81749e579e8aa6566a53.png',
-        '/static/media/game-acuma-item.3619aa78364bfbe8dba3.png'
+        '/static/media/game-logo-tv3.81749e579e8aa6566a53.png'
     ];
 
     // Load saved settings
@@ -28,6 +25,7 @@
     let isRunning = GM_getValue('isRunning', false);
     let intervalSpeed = GM_getValue('intervalSpeed', 200);
     let darkMode = GM_getValue('darkMode', true);
+    let coinLimit = GM_getValue('coinLimit', 1000); // Default coin limit
 
     // Create modern UI
     function createUI() {
@@ -192,14 +190,14 @@
                 background-color: #b00020;
             }
 
-            .speed-control {
+            .speed-control, .coin-limit-control {
                 display: flex;
                 align-items: center;
                 gap: 8px;
                 margin-top: 8px;
             }
 
-            .speed-input {
+            .speed-input, .coin-limit-input {
                 flex: 1;
                 background-color: var(--background);
                 color: var(--on-background);
@@ -209,7 +207,7 @@
                 text-align: center;
             }
 
-            .speed-btn {
+            .speed-btn, .coin-limit-btn {
                 width: 32px;
                 height: 32px;
                 border-radius: 50%;
@@ -221,7 +219,7 @@
                 transition: background-color 0.2s;
             }
 
-            .speed-btn:hover {
+            .speed-btn:hover, .coin-limit-btn:hover {
                 background-color: var(--primary-dark);
             }
 
@@ -363,6 +361,15 @@
                 </div>
 
                 <div class="section">
+                    <div class="section-title">Coin Limit</div>
+                    <div class="coin-limit-control">
+                        <button class="coin-limit-btn" id="decreaseCoinLimit">-</button>
+                        <input type="number" class="coin-limit-input" id="coinLimit" value="${coinLimit}" min="0">
+                        <button class="coin-limit-btn" id="increaseCoinLimit">+</button>
+                    </div>
+                </div>
+
+                <div class="section">
                     <div class="section-title">Quick Actions</div>
                     <div class="quick-actions">
                         <button class="quick-btn" id="quickAcumaClick">
@@ -403,6 +410,9 @@
         document.getElementById('increaseSpeed').addEventListener('click', () => changeSpeed(50));
         document.getElementById('decreaseSpeed').addEventListener('click', () => changeSpeed(-50));
         document.getElementById('intervalSpeed').addEventListener('change', updateSpeed);
+        document.getElementById('increaseCoinLimit').addEventListener('click', () => changeCoinLimit(100));
+        document.getElementById('decreaseCoinLimit').addEventListener('click', () => changeCoinLimit(-100));
+        document.getElementById('coinLimit').addEventListener('change', updateCoinLimit);
         document.getElementById('themeToggle').addEventListener('click', toggleTheme);
         document.getElementById('minimizeBtn').addEventListener('click', toggleMinimize);
         document.getElementById('closeBtn').addEventListener('click', closeUI);
@@ -417,12 +427,20 @@
         setInterval(updateCoinsDisplay, 1000);
     }
 
-    // Update coins display
+    // Update coins display and check limit
     function updateCoinsDisplay() {
         const coinsElement = document.querySelector('.app-coins--value');
         if (coinsElement) {
-            const coinsValue = coinsElement.textContent.trim();
+            const coinsValue = parseInt(coinsElement.textContent.trim());
             document.getElementById('coinsValue').textContent = coinsValue;
+            if (isRunning && coinsValue >= coinLimit) {
+                toggleScript();
+                GM_notification({
+                    text: `Coin limit of ${coinLimit} reached! Auto-clicker stopped.`,
+                    title: 'Coin Limit Reached',
+                    image: 'https://img.icons8.com/fluency/48/000000/coin.png'
+                });
+            }
         }
     }
 
@@ -464,6 +482,9 @@
         intervalSpeed = parseInt(document.getElementById('intervalSpeed').value);
         GM_setValue('intervalSpeed', intervalSpeed);
 
+        coinLimit = parseInt(document.getElementById('coinLimit').value);
+        GM_setValue('coinLimit', coinLimit);
+
         if (isRunning) {
             stopClicker();
             startClicker();
@@ -499,6 +520,26 @@
             stopClicker();
             startClicker();
         }
+    }
+
+    // Change coin limit
+    function changeCoinLimit(amount) {
+        const coinLimitInput = document.getElementById('coinLimit');
+        let newLimit = parseInt(coinLimitInput.value) + amount;
+        if (newLimit < 0) newLimit = 0;
+        coinLimitInput.value = newLimit;
+        updateCoinLimit();
+    }
+
+    // Update coin limit
+    function updateCoinLimit() {
+        const coinLimitInput = document.getElementById('coinLimit');
+        coinLimit = parseInt(coinLimitInput.value);
+        if (coinLimit < 0) {
+            coinLimit = 0;
+            coinLimitInput.value = 0;
+        }
+        GM_setValue('coinLimit', coinLimit);
     }
 
     // Toggle theme
@@ -609,34 +650,84 @@
     }
 
     function clickAppGameItemWithImage(targetImageSrcList) {
-        const gameItems = document.querySelectorAll('.app-game-item');
-        let found = false;
+    const gameItems = document.querySelectorAll('.app-game-item');
+    let found = false;
 
-        gameItems.forEach(item => {
-            const imgElement = item.querySelector('img');
+    gameItems.forEach(item => {
+        const imgElement = item.querySelector('img');
 
-            for (const targetImageSrc of targetImageSrcList) {
-                if (imgElement && imgElement.src.includes(targetImageSrc)) {
-                    item.click();
-                    console.log('Clicked on:', targetImageSrc);
-                    found = true;
-                    return;
-                }
+        for (const targetImageSrc of targetImageSrcList) {
+            if (imgElement && imgElement.src.includes(targetImageSrc)) {
+                // Create a Touch object
+                const touch = new Touch({
+                    identifier: Date.now(),
+                    target: item,
+                    clientX: 0,
+                    clientY: 0,
+                    pageX: 0,
+                    pageY: 0,
+                    screenX: 0,
+                    screenY: 0,
+                    radiusX: 1,
+                    radiusY: 1,
+                    rotationAngle: 0,
+                    force: 1
+                });
 
-                const bgImage = window.getComputedStyle(item).backgroundImage;
-                if (bgImage.includes(targetImageSrc)) {
-                    item.click();
-                    console.log('Clicked on (background):', targetImageSrc);
-                    found = true;
-                    return;
-                }
+                // Create TouchEvent with proper TouchList
+                const touchEvent = new TouchEvent('touchstart', {
+                    bubbles: true,
+                    cancelable: true,
+                    touches: [touch],
+                    targetTouches: [touch],
+                    changedTouches: [touch]
+                });
+
+                item.dispatchEvent(touchEvent);
+                console.log('Touched on:', targetImageSrc);
+                found = true;
+                return;
             }
-        });
 
-        if (!found) {
-            console.log('Images not found. Retrying...');
+            const bgImage = window.getComputedStyle(item).backgroundImage;
+            if (bgImage.includes(targetImageSrc)) {
+                // Create a Touch object
+                const touch = new Touch({
+                    identifier: Date.now(),
+                    target: item,
+                    clientX: 0,
+                    clientY: 0,
+                    pageX: 0,
+                    pageY: 0,
+                    screenX: 0,
+                    screenY: 0,
+                    radiusX: 1,
+                    radiusY: 1,
+                    rotationAngle: 0,
+                    force: 1
+                });
+
+                // Create TouchEvent with proper TouchList
+                const touchEvent = new TouchEvent('touchstart', {
+                    bubbles: true,
+                    cancelable: true,
+                    touches: [touch],
+                    targetTouches: [touch],
+                    changedTouches: [touch]
+                });
+
+                item.dispatchEvent(touchEvent);
+                console.log('Touched on (background):', targetImageSrc);
+                found = true;
+                return;
+            }
         }
+    });
+
+    if (!found) {
+        console.log('Images not found. Retrying...');
     }
+}
 
     // Initialize
     createUI();
