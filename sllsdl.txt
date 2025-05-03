@@ -651,6 +651,7 @@
 
 // Функция для поиска и клика
 // Функция для поиска и клика
+// Функция для поиска и клика
 function clickAppGameItemWithImage(targetImageSrcList) {
     const gameItems = document.querySelectorAll('.app-game-item');
     let found = false;
